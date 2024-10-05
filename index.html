@@ -218,19 +218,6 @@
                                 hasPermission = false;
                                 reject(err);
                             });
-                    } else if (navigator.getUserMedia) {
-                        navigator.getUserMedia({ audio: true },
-                            () => {
-                                hasPermission = true;
-                                console.log('麦克风权限已授予');
-                                resolve(true);
-                            },
-                            (err) => {
-                                console.error('麦克风权限未授予:', err);
-                                hasPermission = false;
-                                reject(err);
-                            }
-                        );
                     } else {
                         console.error('此浏览器不支持 getUserMedia');
                         hasPermission = false;
@@ -250,8 +237,8 @@
                             }
                         })
                         .catch(err => {
+                            alert('无法获取麦克风权限，请检查浏览器设置并刷新页面重试。');
                             console.error('麦克风权限错误:', err);
-                            alert('无法获取麦克风权限，请检查浏览器设置并刷新页面重试。如果问题仍然存在，请尝试在浏览器设置中手动允许麦克风访问。');
                         });
                 } else {
                     toggleRecording();
@@ -306,6 +293,9 @@
             voiceButton.addEventListener('contextmenu', (event) => {
                 event.preventDefault();
             });
+
+            // 页面加载时预先请求权限
+            requestMicrophonePermission();
 
             // 修改 recognition 的设置
             recognition.continuous = true; // 允许连续识别
