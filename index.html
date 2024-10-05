@@ -1,55 +1,421 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+    <!-- 元信息 -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>数字判断器</title>
+    <title>语音与图像识别</title>
+    <link rel="manifest" href="manifest.json">
+    <!-- 样式 -->
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
+            min-height: 100vh;
+        }
+        .tabs {
+            display: flex;
             justify-content: center;
-            height: 100vh;
-            margin: 0;
+            width: 100%;
+            max-width: 400px;
+            margin-bottom: 20px;
+            position: sticky;
+            top: 20px;
+            background-color: #f0f0f0;
+            padding: 10px 0;
+            z-index: 10;
         }
-        #input-section, #output-section {
-            margin: 20px;
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 15px;
+            transition: all 0.3s ease;
+            background-color: #e0e0e0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin: 0 10px;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
-        #output-section {
-            font-size: 1.5em;
-            color: #333;
+        .tab.active {
+            background-color: #4CAF50;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transform: translateY(2px);
+        }
+        .content {
+            display: none;
+            width: 100%;
+            max-width: 400px;
+        }
+        .content.active {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .text-area {
+            width: 100%;
+            height: 150px;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: none;
+            border-radius: 10px;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+            resize: none;
+            font-size: 16px;
+            user-select: none;
+        }
+        .button {
+            width: 150px;
+            height: 150px;
+            margin: 10px;
+            border-radius: 50%;
+            background-color: #4CAF50;
+            color: white;
+            font-size: 18px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+            user-select: none; /* 使文字不可选中 */
+            -webkit-tap-highlight-color: transparent; /* 去除点击高亮 */
+        }
+        .button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 50%);
+        }
+        .button:hover {
+            background-color: #45a049;
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+        }
+        .button:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        #imageActions {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        #imagePreview {
+            max-width: 100%;
+            max-height: 300px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        #imageInfo {
+            width: 100%;
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+            user-select: none;
+        }
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            .button {
+                width: 100px;
+                height: 100px;
+                font-size: 14px;
+            }
+            .text-area {
+                height: 100px;
+            }
+            #imagePreview {
+                max-height: 200px;
+            }
         }
     </style>
 </head>
 <body>
-
-    <div id="input-section">
-        <label for="number-input">请输入一个数字：</label>
-        <input type="number" id="number-input">
-        <button onclick="processNumber()">提交</button>
+    <!-- 导航标签 -->
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('voice')">语音识别</div>
+        <div class="tab" onclick="switchTab('image')">图片识别</div>
     </div>
-
-    <div id="output-section">
-        <p id="output"></p>
+    <!-- 语音识别内容 -->
+    <div id="voiceContent" class="content active">
+        <textarea class="text-area" id="voiceResult" placeholder="识别结果将显示在这里" readonly></textarea>
+        <button class="button" id="voiceButton">点击开始录音</button>
+        <div id="recordingStatus" style="display: none; color: red; margin-top: 10px;">正在录音...</div>
     </div>
-
+    <!-- 图片识别内容 -->
+    <div id="imageContent" class="content">
+        <img id="imagePreview" src="" alt="图片预览" style="display: none;">
+        <div id="imageInfo" style="display: none;"></div>
+        <textarea class="text-area" id="imageQuestion" placeholder="输入关于图片的问题" readonly></textarea>
+        <div id="imageActions">
+            <button class="button" onclick="selectImage()">选择图片</button>
+            <button class="button" onclick="openCamera()">拍照</button>
+            <button class="button" onclick="analyzeImage()">分析图片</button>
+        </div>
+        <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="handleImageSelect(event)">
+    </div>
+    <!-- 脚本 -->
     <script>
-        function processNumber() {
-            const input = document.getElementById('number-input').value;
-            const number = parseInt(input);
-            let output = `你输入的数字是 ${number}，它是 `;
+        // 注册 Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js')
+                .then((reg) => console.log('Service worker registered', reg))
+                .catch((err) => console.log('Service worker not registered', err));
+        }
 
-            if (number % 2 === 0) {
-                output += '双数。呵呵呵';
-            } else {
-                output += '单数。哈哈哈';
+        // 切换标签页
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tab + 'Content').classList.add('active');
+        }
+
+        // 初始化语音识别
+        window.addEventListener('DOMContentLoaded', () => {
+            // 检查浏览器是否支持 SpeechRecognition
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert('抱歉，您的浏览器不支持语音识别功能。');
+                return;
             }
 
-            document.getElementById('output').textContent = output;
+            const recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'zh-CN';
+
+            const voiceButton = document.getElementById('voiceButton');
+            const textArea = document.getElementById('voiceResult');
+            let isRecording = false;
+            let hasPermission = false;
+
+            // 修改请求麦克风权限的函数
+            function requestMicrophonePermission() {
+                return new Promise((resolve, reject) => {
+                    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                        navigator.mediaDevices.getUserMedia({ audio: true })
+                            .then(stream => {
+                                stream.getTracks().forEach(track => track.stop());
+                                hasPermission = true;
+                                console.log('麦克风权限已授予');
+                                resolve(true);
+                            })
+                            .catch(err => {
+                                console.error('麦克风权限未授予:', err);
+                                hasPermission = false;
+                                reject(err);
+                            });
+                    } else if (navigator.getUserMedia) {
+                        navigator.getUserMedia({ audio: true },
+                            () => {
+                                hasPermission = true;
+                                console.log('麦克风权限已授予');
+                                resolve(true);
+                            },
+                            (err) => {
+                                console.error('麦克风权限未授予:', err);
+                                hasPermission = false;
+                                reject(err);
+                            }
+                        );
+                    } else {
+                        console.error('此浏览器不支持 getUserMedia');
+                        hasPermission = false;
+                        reject(new Error('浏览器不支持'));
+                    }
+                });
+            }
+
+            // 修改处理按钮点击事件的函数
+            function handleButtonClick(event) {
+                event.preventDefault();
+                if (!hasPermission) {
+                    requestMicrophonePermission()
+                        .then(() => {
+                            if (hasPermission) {
+                                toggleRecording();
+                            }
+                        })
+                        .catch(err => {
+                            console.error('麦克风权限错误:', err);
+                            alert('无法获取麦克风权限，请检查浏览器设置并刷新页面重试。如果问题仍然存在，请尝试在浏览器设置中手动允许麦克风访问。');
+                        });
+                } else {
+                    toggleRecording();
+                }
+            }
+
+            // 开始录音
+            function startRecording() {
+                if (isRecording) return;
+                isRecording = true;
+                voiceButton.textContent = '点击停止录音';
+                try {
+                    recognition.start();
+                } catch (err) {
+                    console.error('无法启动识别: ', err);
+                    stopRecording();
+                }
+                document.getElementById('recordingStatus').style.display = 'block';
+            }
+
+            // 停止录音
+            function stopRecording() {
+                if (!isRecording) return;
+                isRecording = false;
+                voiceButton.textContent = '点击开始录音';
+                recognition.stop();
+                document.getElementById('recordingStatus').style.display = 'none';
+            }
+
+            // 切换录音状态
+            function toggleRecording() {
+                if (isRecording) {
+                    stopRecording();
+                } else {
+                    startRecording();
+                }
+            }
+
+            // 添加事件监听器
+            if (isMobileDevice()) {
+                // 移动设备特殊处理
+                voiceButton.addEventListener('touchstart', handleButtonClick);
+                voiceButton.addEventListener('touchend', (e) => {
+                    e.preventDefault(); // 防止触发点击事件
+                });
+            } else {
+                // 桌面设备处理（保持不变）
+                voiceButton.addEventListener('click', handleButtonClick);
+            }
+
+            // 防止长按触发上下文菜单
+            voiceButton.addEventListener('contextmenu', (event) => {
+                event.preventDefault();
+            });
+
+            // 修改 recognition 的设置
+            recognition.continuous = true; // 允许连续识别
+            recognition.interimResults = true; // 允许中间结果
+
+            // 处理识别结果
+            recognition.onresult = function(event) {
+                let finalTranscript = '';
+                let interimTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+
+                // 只有当有最终结果时才追加到文本框
+                if (finalTranscript !== '') {
+                    textArea.value += finalTranscript + ' ';
+                }
+                
+                // 在某个临时元素中显示中间结果
+                let interimElement = document.getElementById('interimResult');
+                if (!interimElement) {
+                    interimElement = document.createElement('div');
+                    interimElement.id = 'interimResult';
+                    document.body.appendChild(interimElement);
+                }
+                interimElement.textContent = interimTranscript;
+            };
+
+            // 处理识别束事件
+            recognition.onend = function() {
+                if (isRecording) {
+                    recognition.start();
+                }
+            };
+
+            // 添加清空按钮
+            const clearButton = document.createElement('button');
+            clearButton.textContent = '清空';
+            clearButton.className = 'button'; // 使用与其他按钮相同的样式
+            clearButton.style.width = '80px'; // 调整宽度
+            clearButton.style.height = '80px'; // 调整高度
+            clearButton.style.fontSize = '14px'; // 调整字体大小
+            clearButton.addEventListener('click', () => {
+                textArea.value = '';
+            });
+
+            // 将清空按钮添加到页面
+            document.getElementById('voiceContent').appendChild(clearButton);
+
+            // 处理识别错误
+            recognition.onerror = function(event) {
+                console.error('语音识别错误:', event.error);
+                if (event.error === 'not-allowed') {
+                    alert('麦克风访问被拒绝。请检查浏览器设置并刷新页面重试。');
+                    hasPermission = false;
+                }
+                stopRecording();
+            };
+        });
+
+        // 图片相关功能（保持不变）
+        function selectImage() {
+            document.getElementById('imageInput').removeAttribute('capture');
+            document.getElementById('imageInput').click();
+        }
+
+        function openCamera() {
+            let imageInput = document.getElementById('imageInput');
+            imageInput.setAttribute('capture', 'environment');
+            imageInput.click();
+        }
+
+        function handleImageSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('imagePreview').src = e.target.result;
+                    document.getElementById('imagePreview').style.display = 'block';
+                }
+                reader.readAsDataURL(file);
+
+                document.getElementById('imageInfo').textContent = `已选择图片: ${file.name}`;
+                document.getElementById('imageInfo').style.display = 'block';
+            }
+        }
+
+        function analyzeImage() {
+            let imageInput = document.getElementById('imageInput');
+            let question = document.getElementById('imageQuestion').value;
+            if (imageInput.files && imageInput.files[0]) {
+                if (question.trim() === '') {
+                    alert('请输入关于图片的问题');
+                    return;
+                }
+                // 这里添加图片分析的逻辑，包括发送图片和问题到API
+                alert('开始分析图片并回答问题: ' + question);
+            } else {
+                alert('请先选择或拍摄一张图片');
+            }
+        }
+
+        function isMobileDevice() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         }
     </script>
-
 </body>
 </html>
